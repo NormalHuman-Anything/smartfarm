@@ -23,8 +23,8 @@ Mhz19 co2;
 SoftwareSerial softwareSerial(25, 26);  //RX, TX
 
 
-const char* ssid = "iptime";
-const char* password = "ppap1542";
+const char* ssid = "ssid";
+const char* password = "passwd";
 
 //LiquidCrystal_I2C lcd(0x27,20,4);
 
