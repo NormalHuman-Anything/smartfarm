@@ -7,39 +7,60 @@
 #include <Wire.h>
 #include "SHTSensor.h" //arduino-sht
 #include <ESPmDNS.h>
-#include <LiquidCrystal_I2C.h> // <<that name
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+//#include <LiquidCrystal_I2C.h> // <<that name
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+#define OLED_RESET     -1 // Reset pin # (or -1 if sharing Arduino reset pin)
+#define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 SHTSensor sht;  //21 SDA 22 SCL
 Mhz19 co2;
 SoftwareSerial softwareSerial(25, 26);  //RX, TX
 
-const char* ssid = "iptime";
-const char* password = "ppap1542xd";
 
-LiquidCrystal_I2C lcd(0x27,20,4);
+const char* ssid = "iptime";
+const char* password = "ppap1542";
+
+//LiquidCrystal_I2C lcd(0x27,20,4);
 
 WebServer server(80);
 int temperature = 0;
 void setup() {
   Serial.begin(115200);
   softwareSerial.begin(9600);
-
   Wire.begin();
 
-  lcd.init();                      // initialize the lcd 
-  lcd.init();
-  // Print a message to the LCD.
-  lcd.backlight();
+  if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  display.setTextColor(SSD1306_WHITE);
+  display.display();
+  delay(1000);
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(0,0);
+  display.print("Preheating...");
+  display.display();
 
   co2.begin(&softwareSerial);
   co2.setMeasuringRange(Mhz19MeasuringRange::Ppm_5000);
   co2.enableAutoBaseCalibration();
 
-    Serial.println("Preheating...");  // Preheating, 3 minutes
+  Serial.println("Preheating...");  // Preheating, 3 minutes
   while (!co2.isReady()) {
-    delay(50);
+    delay(1000);
     Serial.print(".");
   }
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.print("Done!!");
+  display.display();
 
   if (sht.init()) {
       Serial.print("init(): success\n");
@@ -47,6 +68,12 @@ void setup() {
       Serial.print("init(): failed\n");
   }
   sht.setAccuracy(SHTSensor::SHT_ACCURACY_HIGH); // only supported by SHT3x
+  delay(1000);
+
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.print("wifi...");
+  display.display();
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -54,6 +81,7 @@ void setup() {
     delay(500);
     Serial.print(".");
   }
+  
   Serial.println("");
   Serial.print("Connected to ");
   Serial.println(ssid);
@@ -64,11 +92,16 @@ void setup() {
   if (MDNS.begin("esp32")) {
     Serial.println("MDNS responder started");
   }
-  lcd.setCursor(0,0);
-  lcd.print(WiFi.localIP());  
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.println("Done!!");
+  display.println(WiFi.localIP());
+  display.setTextSize(3);
+  display.print(":>");
+  display.display();
   
   server.on("/", HandleRoot);
-  //server.on("/metrics", HandleRoot);
+  server.on("/metrics", HandleRoot);
   server.onNotFound(HandleNotFound);
 
   server.begin();
@@ -82,22 +115,23 @@ String GenerateMetrics(){
   sht.readSample();
   String message = "";
 
-  message += "sht.getTemperature ";
+  message += "AirTemp ";
   message += sht.getTemperature();
   message += "\n";
 
-  message += "sht.getHumidity ";
+  message += "AirHumidity ";
   message += sht.getHumidity();
   message += "\n";
 
-  message += "mh-z19b_co2 ";
+  message += "z19b_co2 ";
   message += getCO2();
   message += "\n";
 
-  message += "moisture ";
+  message += "soil_moisture ";
   message += analogRead(33);
   message += "\n";
   return message;
+  Serial.print(message);
 }
 
 void HandleRoot()
@@ -105,6 +139,7 @@ void HandleRoot()
   sht.readSample();
   temperature = sht.getTemperature();
   server.send(200, "text/plain", GenerateMetrics());
+  Serial.print(GenerateMetrics());
 }
 void HandleNotFound()
 {
