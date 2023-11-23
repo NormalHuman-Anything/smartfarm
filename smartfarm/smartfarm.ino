@@ -130,6 +130,10 @@ String GenerateMetrics(){
   message += "soil_moisture ";
   message += analogRead(33);
   message += "\n";
+
+  message += "soil_moisture2 ";
+  message += analogRead(34);
+  message += "\n";
   return message;
   Serial.print(message);
 }
